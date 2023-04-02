@@ -24,20 +24,18 @@ STATUS_START = 0
 PAGES = 1
 PAGE_NO = 1
 
-
 class MirrorStatus:
-    STATUS_UPLOADING = "Upload"
-    STATUS_DOWNLOADING = "Download"
-    STATUS_CLONING = "Clone"
-    STATUS_QUEUEDL = "QueueDl"
-    STATUS_QUEUEUP = "QueueUp"
+    STATUS_UPLOADING = "Uploading"
+    STATUS_DOWNLOADING = "Downloading"
+    STATUS_CLONING = "Cloning"
+    STATUS_QUEUEDL = "DL waiting"
+    STATUS_QUEUEUP = "UL waiting"
     STATUS_PAUSED = "Pause"
-    STATUS_ARCHIVING = "Archive"
-    STATUS_EXTRACTING = "Extract"
-    STATUS_SPLITTING = "Split"
+    STATUS_ARCHIVING = "Archiving"
+    STATUS_EXTRACTING = "Extracting"
+    STATUS_SPLITTING = "Splitting"
     STATUS_CHECKING = "CheckUp"
-    STATUS_SEEDING = "Seed"
-
+    STATUS_SEEDING = "Seeding"
 
 class setInterval:
     def __init__(self, interval, action):
@@ -86,80 +84,80 @@ def bt_selection_buttons(id_):
     return buttons.build_menu(2)
 
 def get_progress_bar_string(pct):
-    pct = float(pct.strip('%'))
+    pct = float(pct.split('%')[0])
     p = min(max(pct, 0), 100)
-    cFull = int(p // 8)
-    p_str = '■' * cFull
-    p_str += '□' * (12 - cFull)
-    return f"[{p_str}]"
+    cFull = int(p // 6)
+    p_str = '●' * cFull
+    p_str += '○' * (16 - cFull)
+    return f"{p_str}"
 
 def get_readable_message():
     msg = ""
     button = None
     STATUS_LIMIT = config_dict['STATUS_LIMIT']
     tasks = len(download_dict)
-    globals()['PAGES'] = (tasks + STATUS_LIMIT - 1) // STATUS_LIMIT
-    if PAGE_NO > PAGES:
-        globals()['STATUS_START'] -= STATUS_LIMIT
+    globals()['PAGES'] = ceil(tasks/STATUS_LIMIT)
+    if PAGE_NO > PAGES and PAGES != 0:
+        globals()['COUNT'] -= STATUS_LIMIT
         globals()['PAGE_NO'] -= 1
-    for download in list(download_dict.values())[STATUS_START:STATUS_LIMIT+STATUS_START]:
-        if download.message.chat.type.name in ['SUPERGROUP', 'CHANNEL']:
-            msg += f"<b><a href='{download.message.link}'>{download.status()}</a>: </b>"
-        else:
-            msg += f"<b>{download.status()}: </b>"
-        msg += f"<code>{escape(f'{download.name()}')}</code>"
+    for download in list(download_dict.values())[COUNT:STATUS_LIMIT+COUNT]:
+        msg += f"<b><i>{escape(str(download.name()))}</i></b>\n\n"
+        msg += f"<b>┌ {download.status()} with {download.engine}</b>"
         if download.status() not in [MirrorStatus.STATUS_SPLITTING, MirrorStatus.STATUS_SEEDING]:
-            msg += f"\n{get_progress_bar_string(download.progress())} {download.progress()}"
-            msg += f"\n<b>Processed:</b> {download.processed_bytes()} of {download.size()}"
-            msg += f"\n<b>Speed:</b> {download.speed()} | <b>ETA:</b> {download.eta()}"
+            msg += f"\n<b>├ {get_progress_bar_string(download.progress())}</b> {download.progress()}"
+            msg += f"\n<b>├ Processed</b>: {download.processed_bytes()} of {download.size()}"
+            msg += f"\n<b>├ Speed</b>: {download.speed()}"
+            msg += f"\n<b>├ Estimated</b>: {download.eta()}"
             if hasattr(download, 'seeders_num'):
                 try:
-                    msg += f"\n<b>Seeders:</b> {download.seeders_num()} | <b>Leechers:</b> {download.leechers_num()}"
+                    msg += f"\n<b>├ Seeders</b>: {download.seeders_num()} | <b>Leechers</b>: {download.leechers_num()}"
                 except:
                     pass
         elif download.status() == MirrorStatus.STATUS_SEEDING:
-            msg += f"\n<b>Size: </b>{download.size()}"
-            msg += f"\n<b>Speed: </b>{download.upload_speed()}"
-            msg += f" | <b>Uploaded: </b>{download.uploaded_bytes()}"
-            msg += f"\n<b>Ratio: </b>{download.ratio()}"
-            msg += f" | <b>Time: </b>{download.seeding_time()}"
+            msg += f"\n<b>├ Size</b>: {download.size()}"
+            msg += f"\n<b>├ Speed</b>: {download.upload_speed()}"
+            msg += f"\n<b>├ Uploaded</b>: {download.uploaded_bytes()}"
+            msg += f"\n<b>├ Ratio</b>: {download.ratio()}"
+            msg += f"\n<b>├ Time</b>: {download.seeding_time()}"
         else:
-            msg += f"\n<b>Size: </b>{download.size()}"
-        msg += f"\n<code>/{BotCommands.CancelMirror} {download.gid()}</code>\n\n"
+            msg += f"\n<b>├ Size</b>: {download.size()}"
+        msg += f"\n<b>├ Source</b>: {download.source}"
+        msg += f"\n<b>├ Elapsed</b>: {get_readable_time(time() - download.startTime)}"
+        msg += f"\n<b>├ Upload</b>: {download.mode}"
+        msg += f"\n<b>└ Stop</b>: <code>/{BotCommands.CancelMirror} {download.gid()}</code>\n\n"
     if len(msg) == 0:
         return None, None
     dl_speed = 0
     up_speed = 0
-    for download in download_dict.values():
-        tstatus = download.status()
-        if tstatus == MirrorStatus.STATUS_DOWNLOADING:
+    for download in list(download_dict.values()):
+        if download.status() == MirrorStatus.STATUS_DOWNLOADING:
             spd = download.speed()
             if 'K' in spd:
                 dl_speed += float(spd.split('K')[0]) * 1024
             elif 'M' in spd:
                 dl_speed += float(spd.split('M')[0]) * 1048576
-        elif tstatus == MirrorStatus.STATUS_UPLOADING:
+        elif download.status() == MirrorStatus.STATUS_UPLOADING:
             spd = download.speed()
-            if 'K' in spd:
+            if 'KB/s' in spd:
                 up_speed += float(spd.split('K')[0]) * 1024
-            elif 'M' in spd:
+            elif 'MB/s' in spd:
                 up_speed += float(spd.split('M')[0]) * 1048576
-        elif tstatus == MirrorStatus.STATUS_SEEDING:
+        elif download.status() == MirrorStatus.STATUS_SEEDING:
             spd = download.upload_speed()
             if 'K' in spd:
                 up_speed += float(spd.split('K')[0]) * 1024
             elif 'M' in spd:
                 up_speed += float(spd.split('M')[0]) * 1048576
     if tasks > STATUS_LIMIT:
-        msg += f"<b>Page:</b> {PAGE_NO}/{PAGES} | <b>Tasks:</b> {tasks}\n"
         buttons = ButtonMaker()
-        buttons.ibutton("<<", "status pre")
-        buttons.ibutton(">>", "status nex")
-        buttons.ibutton("♻️", "status ref")
+        buttons.ibutton("Prev", "status pre")
+        buttons.ibutton(f"{PAGE_NO}/{PAGES} ({tasks})", "status ref")
+        buttons.ibutton("Next", "status nex")
         button = buttons.build_menu(3)
-    msg += f"<b>CPU:</b> {cpu_percent()}% | <b>FREE:</b> {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
-    msg += f"\n<b>RAM:</b> {virtual_memory().percent}% | <b>UPTIME:</b> {get_readable_time(time() - botStartTime)}"
-    msg += f"\n<b>DL:</b> {get_readable_file_size(dl_speed)}/s | <b>UL:</b> {get_readable_file_size(up_speed)}/s"
+    msg += f"<b>• Bot Uptime</b>: {get_readable_time(time() - botStartTime)}"
+    msg += f"\n<b>• Free Disk</b>: {get_readable_file_size(disk_usage(DOWNLOAD_DIR).free)}"
+    msg += f"\n<b>• Total downloading speed</b>: {get_readable_file_size(dl_speed)}/s"
+    msg += f"\n<b>• Total uploading speed</b>: {get_readable_file_size(up_speed)}/s"
     return msg, button
 
 async def turn_page(data):
@@ -182,7 +180,7 @@ async def turn_page(data):
                 PAGE_NO -= 1
 
 def get_readable_time(seconds):
-    periods = [('d', 86400), ('h', 3600), ('m', 60), ('s', 1)]
+    periods = [(' Days ', 86400), (' Hours ', 3600), (' Min ', 60), (' Sec', 1)]
     result = ''
     for period_name, period_seconds in periods:
         if seconds >= period_seconds:

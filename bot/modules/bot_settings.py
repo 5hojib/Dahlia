@@ -612,14 +612,7 @@ async def update_private_file(client, message, pre_message):
         elif file_name == 'config.env':
             load_dotenv('config.env', override=True)
             await load_config()
-        if '@github.com' in config_dict['UPSTREAM_REPO']:
-            buttons = ButtonMaker()
-            msg = 'Push to UPSTREAM_REPO ?'
-            buttons.ibutton('Yes!', f"botset push {file_name}")
-            buttons.ibutton('No', "botset close")
-            await sendMessage(message, msg, buttons.build_menu(2))
-        else:
-            await message.delete()
+        await message.delete()
     if file_name == 'rclone.conf':
         await rclone_serve_booter()
     await update_buttons(pre_message)

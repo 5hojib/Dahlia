@@ -10,7 +10,7 @@ from pyrogram.handlers import MessageHandler
 from pyrogram.filters import command
 from asyncio import create_subprocess_exec, gather
 
-from bot import bot, botStartTime, LOGGER, Interval, DATABASE_URL, user, QbInterval, INCOMPLETE_TASK_NOTIFIER, scheduler
+from bot import bot, alive, botStartTime, LOGGER, Interval, DATABASE_URL, user, QbInterval, INCOMPLETE_TASK_NOTIFIER, scheduler
 from .helper.ext_utils.fs_utils import start_cleanup, clean_all, exit_clean_up
 from .helper.ext_utils.bot_utils import get_readable_file_size, get_readable_time, cmd_exec, sync_to_async
 from .helper.ext_utils.db_handler import DbManger
@@ -23,31 +23,43 @@ from .modules import authorize, gd_clone, gd_count, gd_delete, gd_list, cancel_m
 
 start_aria2_listener()
 
+version = "1.0.1 Initial"
 async def stats(client, message):
-    if await aiopath.exists('.git'):
-        last_commit = await cmd_exec("git log -1 --date=short --pretty=format:'%cd <b>From</b> %cr'", True)
-        last_commit = last_commit[0]
-    else:
-        last_commit = 'No UPSTREAM_REPO'
     total, used, free, disk = disk_usage('/')
     swap = swap_memory()
     memory = virtual_memory()
-    stats = f'<b>Commit Date:</b> {last_commit}\n\n'\
-            f'<b>Bot Uptime:</b> {get_readable_time(time() - botStartTime)}\n'\
-            f'<b>OS Uptime:</b> {get_readable_time(time() - boot_time())}\n\n'\
-            f'<b>Total Disk Space:</b> {get_readable_file_size(total)}\n'\
-            f'<b>Used:</b> {get_readable_file_size(used)} | <b>Free:</b> {get_readable_file_size(free)}\n\n'\
-            f'<b>Upload:</b> {get_readable_file_size(net_io_counters().bytes_sent)}\n'\
-            f'<b>Download:</b> {get_readable_file_size(net_io_counters().bytes_recv)}\n\n'\
-            f'<b>CPU:</b> {cpu_percent(interval=0.5)}%\n'\
-            f'<b>RAM:</b> {memory.percent}%\n'\
-            f'<b>DISK:</b> {disk}%\n\n'\
-            f'<b>Physical Cores:</b> {cpu_count(logical=False)}\n'\
-            f'<b>Total Cores:</b> {cpu_count(logical=True)}\n\n'\
-            f'<b>SWAP:</b> {get_readable_file_size(swap.total)} | <b>Used:</b> {swap.percent}%\n'\
-            f'<b>Memory Total:</b> {get_readable_file_size(memory.total)}\n'\
-            f'<b>Memory Free:</b> {get_readable_file_size(memory.available)}\n'\
-            f'<b>Memory Used:</b> {get_readable_file_size(memory.used)}\n'
+    net_io = net_io_counters()
+    currentTime = get_readable_time(time() - botStartTime)
+    mem_p = memory.percent
+    osUptime = get_readable_time(time() - boot_time())
+    cpuUsage = cpu_percent(interval=0.5)
+    if await aiopath.exists('.git'):
+        last_commit = await cmd_exec("git log -1 --date=short --pretty=format:'%cd <b>From</b> %cr'", True)
+        last_commit = last_commit[0]
+        commit_from = await cmd_exec("git log -1 --date=short --pretty=format:'%cr'", True)
+        commit_from = commit_from[0]
+        commit_date = await cmd_exec("git log -1 --date=format:'%d %B %Y' --pretty=format:'%ad'", True)
+        commit_date = commit_date[0]
+        commit_time = await cmd_exec("git log -1 --date=format:'%I:%M:%S %p' --pretty=format:'%ad'", True)
+        commit_time = commit_time[0]
+    else:
+        last_commit = 'No UPSTREAM_REPO'
+    stats = f'<b><u>REPOSITORY INFO</u></b>\n\n' \
+            f'<b>• Repository Version:</b> {version}\n'\
+            f'<b>• Updated:</b> {commit_date}\n'\
+            f'<b>• Commited On: </b>{commit_time}\n'\
+            f'<b>• From: </b>{commit_from}\n'\
+            f'\n'\
+            f'<b><u>BOT INFO</u></b>\n\n'\
+            f'<b>• Uptime:</b> {currentTime}\n'\
+            f'<b>• System:</b> {osUptime}\n'\
+            f'\n'\
+            f'<b><u>SYSTEM INFO</u></b>\n\n'\
+            f'<b>• CPU Usage:</b> {cpuUsage}%\n'\
+            f'<b>• RAM Usage:</b> {mem_p}%\n'\
+            f'<b>• Disk Usage:</b> {disk}%\n'\
+            f'<b>• Free Disk Space:</b> {get_readable_file_size(free)}\n'\
+            f'<b>• Total Disk Space:</b> {get_readable_file_size(total)}\n'
     await sendMessage(message, stats)
 
 async def start(client, message):
